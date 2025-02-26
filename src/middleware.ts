@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import aj from "./config/arcjet";
 
-
-export async function middleware(req: NextRequest) {
+export async function middleware(req) {
   const decision = await aj.protect(req, { requested: 1 }); // Deduct 1 token per request
 
   console.log("Arcjet decision", decision);

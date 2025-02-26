@@ -1,8 +1,9 @@
-import arcjet, { detectBot, shield, tokenBucket } from "@arcjet/next";
+import arcjet from "@arcjet/next";
+import { detectBot, shield, tokenBucket } from "@arcjet/next";
 
 // Initialize Arcjet with rules
 const aj = arcjet({
-  key: process.env.ARCJET_KEY!,
+  key: process.env.ARCJET_KEY, // Removed TypeScript's `!`
   rules: [
     shield({ mode: "LIVE" }), // Protects against SQL injection, XSS, etc.
     detectBot({
