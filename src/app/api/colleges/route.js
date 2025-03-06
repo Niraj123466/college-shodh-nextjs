@@ -3,7 +3,7 @@ import Colleges from "@/models/college.model";
 import { expandSearchQuery } from "@/utils/searchQueryExpander";
 import { NextResponse } from "next/server";
 
-// ✅ Update allowedOrigins to include your frontend URL
+
 const allowedOrigins = [
   "https://www.collegeshodh.in/"
 ];
