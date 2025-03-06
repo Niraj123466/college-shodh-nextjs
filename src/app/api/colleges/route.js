@@ -3,15 +3,36 @@ import Colleges from "@/models/college.model";
 import { expandSearchQuery } from "@/utils/searchQueryExpander";
 import { NextResponse } from "next/server";
 
-// GET Method
-export const GET = async () => {
-  await connectDB(); // Ensure the database connection is established
+// ✅ Update allowedOrigins to include your frontend URL
+const allowedOrigins = [
+  "https://www.collegeshodh.in/"
+];
+
+export async function OPTIONS(req) {
+  const origin = req.headers.get("origin");
+
+  if (allowedOrigins.includes(origin)) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
+  }
+
+  return new NextResponse(null, { status: 403 }); // Forbidden if origin is not allowed
+}
+
+export async function GET() {
+  await connectDB();
   try {
-    // Fetch all colleges from MongoDB
     const colleges = await Colleges.find().skip(0).limit(10);
     const totalCount = await Colleges.countDocuments();
-    return NextResponse.json(
-      {
+
+    return new NextResponse(
+      JSON.stringify({
         colleges,
         pagination: {
           total: totalCount,
@@ -19,89 +40,81 @@ export const GET = async () => {
           limit: 10,
           totalPages: Math.ceil(totalCount / 10),
         },
-      },
-      { status: 200 }
+      }),
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*", // Allow all origins for GET requests
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      }
     );
   } catch (error) {
     console.error("Error fetching colleges:", error);
-    return NextResponse.json({ error: "Error fetching colleges" }, { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: "Error fetching colleges" }),
+      { status: 500 }
+    );
   }
-};
+}
 
-// POST Method
-export const POST = async (req) => {
+
+export async function POST(req) {
   await connectDB();
   try {
     const body = await req.json();
-    const { course = null, city = null, state = null, naacRanking = null, nba = null, page = 1, limit = 10, search = null } = body;
+    const { course, city, state, naacRanking, nba, page = 1, limit = 10, search } = body;
 
-    // Build the query object dynamically
     const query = {};
 
-    // Add search filter with expanded terms
+    // ✅ Handle search functionality
     if (search) {
       const expandedTerms = expandSearchQuery(search);
-      const searchQueries = expandedTerms.map(term => ({
-        $or: [
-          { college_name: { $regex: new RegExp(term, 'i') } },
-        ]
+      query.$or = expandedTerms.map(term => ({
+        college_name: { $regex: new RegExp(term, "i") }
       }));
-
-      query.$or = searchQueries;
     }
 
-    // Add city and state filter
     if (city || state) {
-      const addressFilters = [];
-      if (city) {
-        addressFilters.push({ address: { $regex: new RegExp(city, 'i') } }); // Case-insensitive city match
-      }
-      if (state) {
-        addressFilters.push({ address: { $regex: new RegExp(state, 'i') } }); // Case-insensitive state match
-      }
-      query.$and = addressFilters; // Combine city and state filters
+      query.$and = [];
+      if (city) query.$and.push({ address: { $regex: new RegExp(city, "i") } });
+      if (state) query.$and.push({ address: { $regex: new RegExp(state, "i") } });
     }
 
-    if (course) {
-      query.dept = { $regex: new RegExp(course, 'i') }; // Case-insensitive course match
-    }
+    if (course) query.dept = { $regex: new RegExp(course, "i") };
+    if (naacRanking) query.naac = { $eq: naacRanking };
+    if (nba) query.nba = nba === "Accredited";
 
-    // Add NAAC ranking filter
-    if (naacRanking) {
-      query.naac = { $eq: naacRanking }; // Exact match
-    }
-
-    // Add NBA filter
-    if (nba) {
-      query.nba = { $regex: new RegExp(nba, 'i') }; // Case-insensitive NBA match
-    }
-
-    // Calculate pagination
     const skip = (page - 1) * limit;
     const totalCount = await Colleges.countDocuments(query);
+    const results = await Colleges.find(query).skip(skip).limit(limit);
 
-    // Fetch the filtered and paginated data with scoring
-    const results = await Colleges.find(query)
-      .skip(skip)
-      .limit(limit);
-
-    return NextResponse.json(
-      {
+    return new NextResponse(
+      JSON.stringify({
         colleges: results,
+        selectedCourse: course,
         pagination: {
           total: totalCount,
           page,
           limit,
           totalPages: Math.ceil(totalCount / limit),
         },
-      },
-      { status: 200 }
+      }),
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*", // Allow all origins for GET requests
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      }
     );
   } catch (error) {
-    console.error('Error fetching colleges:', error);
-    return NextResponse.json(
-      { error: 'Error fetching colleges' },
+    console.error("Error fetching colleges:", error);
+    return new NextResponse(
+      JSON.stringify({ error: "Error fetching colleges" }),
       { status: 500 }
     );
   }
-};
+}
